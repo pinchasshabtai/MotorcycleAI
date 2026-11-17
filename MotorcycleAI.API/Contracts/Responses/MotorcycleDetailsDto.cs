@@ -14,6 +14,10 @@ public sealed class MotorcycleDetailsDto
 
     public decimal Price { get; init; }
 
+    public bool PriceIsEstimate { get; init; }
+
+    public bool AttributesAreEstimated { get; init; }
+
     public string? VehicleType { get; init; }
 
     public string MotorcycleType { get; init; } = string.Empty;

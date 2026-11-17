@@ -151,6 +151,8 @@ public sealed class MotorcyclesApiTests
     public async Task GetById_ReturnsMotorcycleDto()
     {
         var motorcycle = CreateMotorcycle(7);
+        motorcycle.PriceIsEstimate = true;
+        motorcycle.AttributesAreEstimated = true;
         var analyzer = new Mock<ISearchAnalyzer>();
         var repository = new Mock<IMotorcycleRepository>();
         repository
@@ -167,6 +169,8 @@ public sealed class MotorcyclesApiTests
         Assert.NotNull(result);
         Assert.Equal(7, result.Id);
         Assert.Equal("Honda", result.Manufacturer);
+        Assert.True(result.PriceIsEstimate);
+        Assert.True(result.AttributesAreEstimated);
     }
 
     [Fact]
@@ -216,6 +220,7 @@ public sealed class MotorcyclesApiTests
             Year = 2024,
             EngineCC = 350,
             Price = 25_000,
+            PriceIsEstimate = false,
             MotorcycleType = "Naked"
         };
     }

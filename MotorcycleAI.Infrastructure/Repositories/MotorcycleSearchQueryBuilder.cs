@@ -21,6 +21,8 @@ internal static class MotorcycleSearchQueryBuilder
                 [Year] AS [Year],
                 EngineCC,
                 Price,
+                PriceIsEstimate,
+                AttributesAreEstimated,
                 VehicleType,
                 MotorcycleType,
                 RiderExperience,

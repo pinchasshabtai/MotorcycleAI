@@ -27,6 +27,8 @@ public sealed class MotorcycleSearchQueryBuilderTests
         Assert.Contains("EngineCC >= @MinEngineCC", command.CommandText);
         Assert.Contains("[Year] <= @MaxYear", command.CommandText);
         Assert.Contains("Manufacturer IN @PreferredBrands", command.CommandText);
+        Assert.Contains("PriceIsEstimate", command.CommandText);
+        Assert.Contains("AttributesAreEstimated", command.CommandText);
         Assert.Equal(10_000m, parameters.Get<decimal>("MinPrice"));
         Assert.Equal(50_000m, parameters.Get<decimal>("MaxPrice"));
         Assert.Equal(125, parameters.Get<int>("MinEngineCC"));

@@ -141,9 +141,18 @@ function createRecommendationCard(recommendation, motorcycle) {
     card.append(header);
 
     if (motorcycle) {
+        if (motorcycle.attributesAreEstimated) {
+            const estimateNotice = document.createElement("p");
+            estimateNotice.className = "estimate-notice";
+            estimateNotice.textContent = "מאפייני ההתאמה מבוססים על הערכה כללית ולא על נתון יצרן.";
+            card.append(estimateNotice);
+        }
+
         const price = document.createElement("p");
         price.className = "bike-price";
-        price.textContent = formatPrice(motorcycle.price);
+        price.textContent = motorcycle.priceIsEstimate
+            ? `מחיר משוער להמחשה בלבד: ${formatPrice(motorcycle.price)}`
+            : formatPrice(motorcycle.price);
         card.append(price);
     }
 
@@ -252,7 +261,7 @@ function setLoading(isLoading) {
 
 function formatPrice(price) {
     if (typeof price !== "number" || !Number.isFinite(price)) {
-        return "מחיר לא זמין";
+        return "לא זמין";
     }
     return new Intl.NumberFormat("he-IL", {
         style: "currency",

@@ -252,6 +252,12 @@ h1 {
     font-weight: 700;
 }
 
+.estimate-notice {
+    margin: 8px 0 0;
+    color: #e8c879;
+    font-size: 11px;
+}
+
 .recommendation-reason {
     margin: 8px 0 0;
     color: #d7deea;

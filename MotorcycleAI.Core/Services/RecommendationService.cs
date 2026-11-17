@@ -12,6 +12,8 @@ public sealed class RecommendationService : IRecommendationService
         כתוב בעברית סיכום והסברים קצרים להמלצות על סמך המידע שסופק בלבד.
         לכל המלצה השתמש רק ב-supportedAdvantages וב-supportedDisadvantages כעובדות על התאמה.
         אל תמציא או תשנה מחיר, שנתון, נפח מנוע, מותג או מפרט.
+        אם PriceIsEstimate הוא true, המחיר הוא אומדן להמחשה בלבד ולא מחיר מאומת.
+        אם AttributesAreEstimated הוא true, קטגוריה, שימוש, ניסיון ועלות תחזוקה הם הערכות כלליות; שנתון ונפח המנוע עדיין נלקחו ממקור הרישום.
         אל תוסיף אופנועים שאינם ברשימת המועמדים ואל תחשב או תציע ציון.
         החזר לכל MotorcycleId מועמד הסבר אחד. יתרונות וחסרונות ייקבעו על ידי הקוד בלבד.
         """;
@@ -73,6 +75,8 @@ public sealed class RecommendationService : IRecommendationService
                     scored.Motorcycle.Year,
                     scored.Motorcycle.EngineCC,
                     scored.Motorcycle.Price,
+                    scored.Motorcycle.PriceIsEstimate,
+                    scored.Motorcycle.AttributesAreEstimated,
                     scored.Motorcycle.VehicleType,
                     scored.Motorcycle.MotorcycleType,
                     scored.Motorcycle.RiderExperience,
@@ -310,6 +314,13 @@ public sealed class RecommendationService : IRecommendationService
     {
         if (string.IsNullOrWhiteSpace(requestedValue))
         {
+            return;
+        }
+
+        if (string.Equals(actualValue, "Not rated", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(actualValue, "Unknown", StringComparison.OrdinalIgnoreCase))
+        {
+            disadvantages.Add($"אין נתון מאומת לגבי {criterionName}.");
             return;
         }
 

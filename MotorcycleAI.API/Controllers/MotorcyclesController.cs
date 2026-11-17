@@ -117,6 +117,8 @@ public sealed class MotorcyclesController : ControllerBase
             Year = motorcycle.Year,
             EngineCC = motorcycle.EngineCC,
             Price = motorcycle.Price,
+            PriceIsEstimate = motorcycle.PriceIsEstimate,
+            AttributesAreEstimated = motorcycle.AttributesAreEstimated,
             VehicleType = motorcycle.VehicleType,
             MotorcycleType = motorcycle.MotorcycleType,
             RiderExperience = motorcycle.RiderExperience,

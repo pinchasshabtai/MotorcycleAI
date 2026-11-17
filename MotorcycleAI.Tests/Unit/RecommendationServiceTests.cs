@@ -82,6 +82,25 @@ public sealed class RecommendationServiceTests
     }
 
     [Fact]
+    public async Task RecommendAsync_DoesNotPenalizeUnratedReliability()
+    {
+        var generator = CreateGenerator(
+            """{"summary":"סיכום","recommendations":[{"motorcycleId":1,"reason":"האמינות אינה מדורגת במאגר."}]}""");
+        var service = new RecommendationService(generator.Object, NullLogger<RecommendationService>.Instance);
+        var motorcycle = CreateMotorcycle(1);
+        motorcycle.Reliability = "Not rated";
+
+        var result = await service.RecommendAsync(
+            "מחפש אופנוע אמין",
+            new MotorcycleSearchRequest { Reliability = "High" },
+            [motorcycle]);
+
+        var recommendation = Assert.Single(result.Recommendations);
+        Assert.Equal(50m, recommendation.MatchScore);
+        Assert.Contains(recommendation.Disadvantages, item => item.Contains("אין נתון מאומת"));
+    }
+
+    [Fact]
     public async Task RecommendAsync_ReturnsSummaryWithoutCallingAiWhenNoMotorcyclesWereFound()
     {
         var generator = new Mock<IStructuredResponseGenerator>();
