@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#111827">
+    <title>MotorcycleAI | יועץ האופנועים שלך</title>
+    <link rel="stylesheet" href="/app.css">
+    <script src="/app.js" defer></script>
+</head>
+<body>
+    <main class="app-shell">
+        <header class="topbar">
+            <a class="brand" href="/" aria-label="MotorcycleAI - דף הבית">
+                <span class="brand-mark" aria-hidden="true">M</span>
+                <span>Motorcycle<span class="brand-accent">AI</span></span>
+            </a>
+            <a class="api-link" href="/swagger" target="_blank" rel="noreferrer">Swagger API</a>
+        </header>
+
+        <section class="chat-panel" aria-label="שיחה עם יועץ האופנועים">
+            <div class="chat-heading">
+                <div class="assistant-avatar" aria-hidden="true">AI</div>
+                <div>
+                    <p class="eyebrow">יועץ הרכיבה שלך</p>
+                    <h1>בוא נמצא את האופנוע שלך</h1>
+                    <p class="subtitle">ספר לי מה חשוב לך, ואחפש אפשרויות מתאימות.</p>
+                </div>
+            </div>
+
+            <div id="conversation" class="conversation" role="log" aria-live="polite" aria-relevant="additions">
+                <article class="message assistant-message">
+                    <div class="message-avatar" aria-hidden="true">AI</div>
+                    <div class="message-content">
+                        <p>שלום! איזה אופנוע אתה מחפש? אפשר לציין תקציב, ניסיון, שימוש או העדפות אחרות.</p>
+                        <button class="suggestion" type="button">אני מתחיל, מחפש אופנוע עד 30 אלף שקל לנסיעות בעיר</button>
+                    </div>
+                </article>
+            </div>
+
+            <form id="search-form" class="composer">
+                <label class="sr-only" for="query">תאר את האופנוע שאתה מחפש</label>
+                <textarea
+                    id="query"
+                    name="query"
+                    rows="1"
+                    maxlength="2000"
+                    placeholder="למשל: אופנוע נוח לנסיעות יומיומיות, עד 30 אלף שקל..."
+                    required></textarea>
+                <button id="send-button" class="send-button" type="submit" aria-label="שלח הודעה">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M5 12h14M13 6l6 6-6 6"></path>
+                    </svg>
+                </button>
+            </form>
+            <p class="privacy-note">ההמלצות מבוססות על המידע שבמאגר. כדאי לבדוק פרטים ומחירים מול המוכר.</p>
+        </section>
+    </main>
+</body>
+</html>
