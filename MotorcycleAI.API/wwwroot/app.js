@@ -90,49 +90,35 @@ async function renderSearchResult(result) {
         return;
     }
 
-    const details = await Promise.all(
-        result.recommendations.map(async (recommendation) => {
-            try {
-                const response = await fetch(`/api/motorcycles/${encodeURIComponent(recommendation.motorcycleId)}`);
-                if (!response.ok) {
-                    return null;
-                }
-                return await response.json();
-            } catch {
-                return null;
-            }
-        })
-    );
-
     const list = document.createElement("div");
     list.className = "recommendation-list";
-    for (let index = 0; index < result.recommendations.length; index += 1) {
-        list.append(createRecommendationCard(result.recommendations[index], details[index]));
+    for (const recommendation of result.recommendations) {
+        list.append(createRecommendationCard(recommendation));
     }
     content.append(list);
     conversation.append(message);
     scrollToLatest();
 }
 
-function createRecommendationCard(recommendation, motorcycle) {
+function createRecommendationCard(recommendation) {
+    const motorcycle = recommendation.motorcycle;
     const card = document.createElement("article");
     card.className = "recommendation-card";
 
     const header = document.createElement("div");
     header.className = "recommendation-header";
     const identity = document.createElement("div");
+    const rank = document.createElement("p");
+    rank.className = "recommendation-rank";
+    rank.textContent = recommendation.rankLabel;
     const title = document.createElement("h3");
-    title.textContent = motorcycle
-        ? `${motorcycle.manufacturer} ${motorcycle.model}`
-        : `אופנוע מספר ${recommendation.motorcycleId}`;
-    identity.append(title);
+    title.textContent = `${motorcycle.manufacturer} ${motorcycle.model}`;
+    identity.append(rank, title);
 
-    if (motorcycle) {
-        const specs = document.createElement("p");
-        specs.className = "bike-specs";
-        specs.textContent = `${motorcycle.year} · ${motorcycle.engineCC} סמ״ק`;
-        identity.append(specs);
-    }
+    const specs = document.createElement("p");
+    specs.className = "bike-specs";
+    specs.textContent = `${motorcycle.year} · ${motorcycle.engineCC} סמ״ק`;
+    identity.append(specs);
 
     const score = document.createElement("span");
     score.className = "match-score";
@@ -140,21 +126,19 @@ function createRecommendationCard(recommendation, motorcycle) {
     header.append(identity, score);
     card.append(header);
 
-    if (motorcycle) {
-        if (motorcycle.attributesAreEstimated) {
-            const estimateNotice = document.createElement("p");
-            estimateNotice.className = "estimate-notice";
-            estimateNotice.textContent = "מאפייני ההתאמה מבוססים על הערכה כללית ולא על נתון יצרן.";
-            card.append(estimateNotice);
-        }
-
-        const price = document.createElement("p");
-        price.className = "bike-price";
-        price.textContent = motorcycle.priceIsEstimate
-            ? `מחיר משוער להמחשה בלבד: ${formatPrice(motorcycle.price)}`
-            : formatPrice(motorcycle.price);
-        card.append(price);
+    if (motorcycle.attributesAreEstimated) {
+        const estimateNotice = document.createElement("p");
+        estimateNotice.className = "estimate-notice";
+        estimateNotice.textContent = "מאפייני ההתאמה מבוססים על הערכה כללית ולא על נתון יצרן.";
+        card.append(estimateNotice);
     }
+
+    const price = document.createElement("p");
+    price.className = "bike-price";
+    price.textContent = motorcycle.priceIsEstimate
+        ? `מחיר משוער להמחשה בלבד: ${formatPrice(motorcycle.price)}`
+        : formatPrice(motorcycle.price);
+    card.append(price);
 
     if (recommendation.reason) {
         const reason = document.createElement("p");

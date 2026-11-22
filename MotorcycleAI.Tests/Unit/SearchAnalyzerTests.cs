@@ -49,6 +49,22 @@ public sealed class SearchAnalyzerTests
             .ToArray();
         Assert.Contains("number", nullablePriceTypes);
         Assert.Contains("null", nullablePriceTypes);
+
+        var minEngineCcSchema = capturedSchema
+            .GetProperty("properties")
+            .GetProperty("MinEngineCC");
+        Assert.Equal(0, minEngineCcSchema.GetProperty("minimum").GetInt32());
+        Assert.Equal(10_000, minEngineCcSchema.GetProperty("maximum").GetInt32());
+
+        var minYearSchema = capturedSchema
+            .GetProperty("properties")
+            .GetProperty("MinYear");
+        Assert.Equal(
+            1885,
+            minYearSchema.GetProperty("minimum").GetInt32());
+        Assert.Equal(
+            DateTime.UtcNow.Year + 1,
+            minYearSchema.GetProperty("maximum").GetInt32());
     }
 
     [Fact]

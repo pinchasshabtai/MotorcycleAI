@@ -228,6 +228,13 @@ h1 {
     font-size: 16px;
 }
 
+.recommendation-rank {
+    margin: 0 0 4px;
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 700;
+}
+
 .bike-specs {
     margin: 4px 0 0;
     color: var(--muted);

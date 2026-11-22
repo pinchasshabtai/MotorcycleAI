@@ -1,5 +1,5 @@
+using System.Globalization;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using MotorcycleAI.Core.Interfaces;
 using MotorcycleAI.Core.Models;
@@ -8,6 +8,8 @@ namespace MotorcycleAI.Core.Services;
 
 public sealed class RecommendationService : IRecommendationService
 {
+    private const int MaximumRecommendations = 3;
+
     private const string SystemPrompt = """
         כתוב בעברית סיכום והסברים קצרים להמלצות על סמך המידע שסופק בלבד.
         לכל המלצה השתמש רק ב-supportedAdvantages וב-supportedDisadvantages כעובדות על התאמה.
@@ -15,11 +17,11 @@ public sealed class RecommendationService : IRecommendationService
         אם PriceIsEstimate הוא true, המחיר הוא אומדן להמחשה בלבד ולא מחיר מאומת.
         אם AttributesAreEstimated הוא true, קטגוריה, שימוש, ניסיון ועלות תחזוקה הם הערכות כלליות; שנתון ונפח המנוע עדיין נלקחו ממקור הרישום.
         אל תוסיף אופנועים שאינם ברשימת המועמדים ואל תחשב או תציע ציון.
-        החזר לכל MotorcycleId מועמד הסבר אחד. יתרונות וחסרונות ייקבעו על ידי הקוד בלבד.
+        החזר recommendations כאובייקט שמפתחיו הם מזהי האופנועים בדיוק כפי שסופקו.
+        לכל מפתח החזר reason אחד בלבד. יתרונות וחסרונות ייקבעו על ידי הקוד בלבד.
         """;
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private static readonly JsonElement ExplanationSchema = CreateExplanationSchema();
 
     private readonly IStructuredResponseGenerator _responseGenerator;
     private readonly ILogger<RecommendationService> _logger;
@@ -60,6 +62,7 @@ public sealed class RecommendationService : IRecommendationService
             .OrderByDescending(scored => scored.MatchScore)
             .ThenBy(scored => scored.Motorcycle.Price)
             .ThenByDescending(scored => scored.Motorcycle.Year)
+            .Take(MaximumRecommendations)
             .ToArray();
 
         var prompt = JsonSerializer.Serialize(
@@ -93,7 +96,7 @@ public sealed class RecommendationService : IRecommendationService
         var responseJson = await _responseGenerator.GenerateAsync(
             SystemPrompt,
             prompt,
-            ExplanationSchema,
+            CreateExplanationSchema(scoredMotorcycles),
             cancellationToken);
         if (string.IsNullOrWhiteSpace(responseJson))
         {
@@ -102,21 +105,17 @@ public sealed class RecommendationService : IRecommendationService
         }
 
         var explanationResponse = ParseAndValidateResponse(responseJson, scoredMotorcycles);
-        var explanations = explanationResponse.Recommendations!.ToDictionary(
-            recommendation => recommendation.MotorcycleId);
-
         return new RecommendationResult
         {
-            Summary = explanationResponse.Summary!,
+            Summary = explanationResponse.Summary,
             Recommendations = scoredMotorcycles
                 .Select(scored =>
                 {
-                    var explanation = explanations[scored.Motorcycle.Id];
                     return new Recommendation
                     {
                         MotorcycleId = scored.Motorcycle.Id,
                         MatchScore = scored.MatchScore,
-                        Reason = explanation.Reason!,
+                        Reason = explanationResponse.Reasons[scored.Motorcycle.Id],
                         Advantages = scored.Advantages,
                         Disadvantages = scored.Disadvantages
                     };
@@ -129,12 +128,10 @@ public sealed class RecommendationService : IRecommendationService
         string responseJson,
         IReadOnlyList<ScoredMotorcycle> scoredMotorcycles)
     {
-        RecommendationExplanationResponse? response;
+        JsonDocument document;
         try
         {
-            response = JsonSerializer.Deserialize<RecommendationExplanationResponse>(
-                responseJson,
-                JsonOptions);
+            document = JsonDocument.Parse(responseJson);
         }
         catch (JsonException exception)
         {
@@ -144,38 +141,61 @@ public sealed class RecommendationService : IRecommendationService
                 exception);
         }
 
-        if (response is null || string.IsNullOrWhiteSpace(response.Summary) || response.Recommendations is null)
+        using (document)
         {
-            _logger.LogError("The AI recommendation response is missing its summary or recommendations.");
-            throw new InvalidDataException(
-                "The AI recommendation response is missing its summary or recommendations.");
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object
+                || !root.TryGetProperty("summary", out var summaryElement)
+                || summaryElement.ValueKind != JsonValueKind.String
+                || string.IsNullOrWhiteSpace(summaryElement.GetString())
+                || !root.TryGetProperty("recommendations", out var recommendationsElement)
+                || recommendationsElement.ValueKind != JsonValueKind.Object)
+            {
+                _logger.LogError("The AI recommendation response is missing its summary or recommendations.");
+                throw new InvalidDataException(
+                    "The AI recommendation response is missing its summary or recommendations.");
+            }
+
+            var expectedIds = scoredMotorcycles
+                .Select(scored => scored.Motorcycle.Id.ToString(CultureInfo.InvariantCulture))
+                .ToHashSet(StringComparer.Ordinal);
+            var receivedIds = new HashSet<string>(StringComparer.Ordinal);
+            var reasons = new Dictionary<int, string>();
+
+            foreach (var recommendation in recommendationsElement.EnumerateObject())
+            {
+                if (!expectedIds.Contains(recommendation.Name)
+                    || !receivedIds.Add(recommendation.Name)
+                    || !int.TryParse(
+                        recommendation.Name,
+                        NumberStyles.None,
+                        CultureInfo.InvariantCulture,
+                        out var motorcycleId)
+                    || recommendation.Value.ValueKind != JsonValueKind.Object
+                    || !recommendation.Value.TryGetProperty("reason", out var reasonElement)
+                    || reasonElement.ValueKind != JsonValueKind.String
+                    || string.IsNullOrWhiteSpace(reasonElement.GetString()))
+                {
+                    _logger.LogError(
+                        "The AI recommendation response contains an invalid, duplicate, or unknown motorcycle ID.");
+                    throw new InvalidDataException(
+                        "The AI recommendation response contains an invalid recommendation entry.");
+                }
+
+                reasons.Add(motorcycleId, reasonElement.GetString()!);
+            }
+
+            if (!expectedIds.SetEquals(receivedIds))
+            {
+                _logger.LogError("The AI recommendation response contains missing motorcycle IDs.");
+                throw new InvalidDataException(
+                    "The AI recommendation response must contain each candidate motorcycle exactly once.");
+            }
+
+            return new RecommendationExplanationResponse(
+                summaryElement.GetString()!,
+                reasons);
         }
-
-        var expectedIds = scoredMotorcycles
-            .Select(scored => scored.Motorcycle.Id)
-            .ToHashSet();
-        var receivedIds = response.Recommendations
-            .Select(recommendation => recommendation.MotorcycleId)
-            .ToArray();
-
-        if (receivedIds.Length != expectedIds.Count
-            || receivedIds.Distinct().Count() != receivedIds.Length
-            || !expectedIds.SetEquals(receivedIds))
-        {
-            _logger.LogError("The AI recommendation response contains missing, duplicate, or unknown motorcycle IDs.");
-            throw new InvalidDataException(
-                "The AI recommendation response must contain each candidate motorcycle exactly once.");
-        }
-
-        if (response.Recommendations.Any(recommendation =>
-                string.IsNullOrWhiteSpace(recommendation.Reason)))
-        {
-            _logger.LogError("The AI recommendation response contains incomplete explanation fields.");
-            throw new InvalidDataException(
-                "The AI recommendation response contains incomplete explanation fields.");
-        }
-
-        return response;
     }
 
     private static ScoredMotorcycle ScoreMotorcycle(
@@ -362,33 +382,41 @@ public sealed class RecommendationService : IRecommendationService
         }
     }
 
-    private static JsonElement CreateExplanationSchema()
+    private static JsonElement CreateExplanationSchema(
+        IReadOnlyList<ScoredMotorcycle> scoredMotorcycles)
     {
-        const string schemaJson = """
+        var recommendationProperties = scoredMotorcycles.ToDictionary(
+            scored => scored.Motorcycle.Id.ToString(CultureInfo.InvariantCulture),
+            _ => new
             {
-              "type": "object",
-              "properties": {
-                "summary": { "type": "string" },
-                "recommendations": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "motorcycleId": { "type": "integer" },
-                      "reason": { "type": "string" }
-                    },
-                    "required": ["motorcycleId", "reason"],
-                    "additionalProperties": false
-                  }
+                type = "object",
+                properties = new
+                {
+                    reason = new { type = "string" }
+                },
+                required = new[] { "reason" },
+                additionalProperties = false
+            });
+        var recommendationIds = recommendationProperties.Keys.ToArray();
+        var schema = new
+        {
+            type = "object",
+            properties = new
+            {
+                summary = new { type = "string" },
+                recommendations = new
+                {
+                    type = "object",
+                    properties = recommendationProperties,
+                    required = recommendationIds,
+                    additionalProperties = false
                 }
-              },
-              "required": ["summary", "recommendations"],
-              "additionalProperties": false
-            }
-            """;
+            },
+            required = new[] { "summary", "recommendations" },
+            additionalProperties = false
+        };
 
-        using var document = JsonDocument.Parse(schemaJson);
-        return document.RootElement.Clone();
+        return JsonSerializer.SerializeToElement(schema, JsonOptions);
     }
 
     private sealed record ScoredMotorcycle(
@@ -397,21 +425,7 @@ public sealed class RecommendationService : IRecommendationService
         IReadOnlyList<string> Advantages,
         IReadOnlyList<string> Disadvantages);
 
-    private sealed class RecommendationExplanationResponse
-    {
-        [JsonPropertyName("summary")]
-        public string? Summary { get; init; }
-
-        [JsonPropertyName("recommendations")]
-        public List<RecommendationExplanation>? Recommendations { get; init; }
-    }
-
-    private sealed class RecommendationExplanation
-    {
-        [JsonPropertyName("motorcycleId")]
-        public int MotorcycleId { get; init; }
-
-        [JsonPropertyName("reason")]
-        public string? Reason { get; init; }
-    }
+    private sealed record RecommendationExplanationResponse(
+        string Summary,
+        IReadOnlyDictionary<int, string> Reasons);
 }

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
 using MotorcycleAI.Core.Interfaces;
 using MotorcycleAI.Core.Models;
@@ -156,7 +157,29 @@ public sealed class SearchAnalyzer : ISearchAnalyzer
             }
             """;
 
-        using var document = JsonDocument.Parse(schemaJson);
-        return document.RootElement.Clone();
+        var schema = JsonNode.Parse(schemaJson)
+            ?? throw new InvalidOperationException("The search request JSON Schema is invalid.");
+        var properties = schema["properties"]
+            ?? throw new InvalidOperationException("The search request JSON Schema has no properties.");
+
+        foreach (var propertyName in new[] { "MinEngineCC", "MaxEngineCC" })
+        {
+            var engineSchema = properties[propertyName]
+                ?? throw new InvalidOperationException(
+                    $"The search request JSON Schema is missing '{propertyName}'.");
+            engineSchema["minimum"] = 0;
+            engineSchema["maximum"] = MotorcycleSearchRequestValidator.MaximumEngineCC;
+        }
+
+        foreach (var propertyName in new[] { "MinYear", "MaxYear" })
+        {
+            var yearSchema = properties[propertyName]
+                ?? throw new InvalidOperationException(
+                    $"The search request JSON Schema is missing '{propertyName}'.");
+            yearSchema["minimum"] = MotorcycleSearchRequestValidator.EarliestMotorcycleYear;
+            yearSchema["maximum"] = MotorcycleSearchRequestValidator.LatestMotorcycleYear;
+        }
+
+        return JsonSerializer.SerializeToElement(schema);
     }
 }

@@ -41,12 +41,17 @@ public sealed class MotorcyclesController : ControllerBase
             searchRequest,
             motorcycles,
             cancellationToken);
+        var motorcyclesById = motorcycles.ToDictionary(motorcycle => motorcycle.Id);
 
         return Ok(new MotorcycleSearchResponseDto
         {
             SearchRequest = ToDto(searchRequest),
             Recommendations = recommendationResult.Recommendations
-                .Select(ToDto)
+                .Select((recommendation, index) => ToDto(
+                    recommendation,
+                    motorcyclesById[recommendation.MotorcycleId],
+                    index,
+                    recommendationResult.Recommendations.Count))
                 .ToArray(),
             Summary = recommendationResult.Summary
         });
@@ -95,16 +100,34 @@ public sealed class MotorcyclesController : ControllerBase
         };
     }
 
-    private static MotorcycleRecommendationDto ToDto(Recommendation recommendation)
+    private static MotorcycleRecommendationDto ToDto(
+        Recommendation recommendation,
+        Motorcycle motorcycle,
+        int rankIndex,
+        int recommendationCount)
     {
         return new MotorcycleRecommendationDto
         {
             MotorcycleId = recommendation.MotorcycleId,
+            RankLabel = GetRankLabel(rankIndex, recommendationCount),
             MatchScore = recommendation.MatchScore,
+            Motorcycle = ToDto(motorcycle),
             Reason = recommendation.Reason,
             Advantages = recommendation.Advantages,
             Disadvantages = recommendation.Disadvantages
         };
+    }
+
+    private static string GetRankLabel(int rankIndex, int recommendationCount)
+    {
+        if (rankIndex == 0)
+        {
+            return "ההתאמה הטובה ביותר";
+        }
+
+        return rankIndex == recommendationCount - 1
+            ? "ההתאמה הפחות טובה"
+            : "התאמה באמצע";
     }
 
     private static MotorcycleDetailsDto ToDto(Motorcycle motorcycle)

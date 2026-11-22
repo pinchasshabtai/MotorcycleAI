@@ -4,8 +4,10 @@ namespace MotorcycleAI.Core.Services;
 
 public static class MotorcycleSearchRequestValidator
 {
-    private const int EarliestMotorcycleYear = 1885;
-    private const int MaximumEngineCC = 10_000;
+    internal const int EarliestMotorcycleYear = 1885;
+    internal const int MaximumEngineCC = 10_000;
+
+    internal static int LatestMotorcycleYear => DateTime.UtcNow.Year + 1;
 
     public static void Validate(MotorcycleSearchRequest searchRequest)
     {
@@ -43,7 +45,7 @@ public static class MotorcycleSearchRequestValidator
 
     private static void ValidateYear(int? value, string fieldName)
     {
-        if (value is not null && (value < EarliestMotorcycleYear || value > DateTime.UtcNow.Year + 1))
+        if (value is not null && (value < EarliestMotorcycleYear || value > LatestMotorcycleYear))
         {
             throw new InvalidDataException(
                 $"{fieldName} must be between {EarliestMotorcycleYear} and next year.");

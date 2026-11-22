@@ -61,7 +61,11 @@ public sealed class MotorcyclesApiTests
         Assert.NotNull(result);
         Assert.Equal(30_000, result.SearchRequest.MaxPrice);
         Assert.Equal("נמצאה התאמה.", result.Summary);
-        Assert.Equal(100, Assert.Single(result.Recommendations).MatchScore);
+        var recommendation = Assert.Single(result.Recommendations);
+        Assert.Equal(100, recommendation.MatchScore);
+        Assert.Equal("ההתאמה הטובה ביותר", recommendation.RankLabel);
+        Assert.Equal(motorcycle.Id, recommendation.Motorcycle.Id);
+        Assert.Equal(motorcycle.EngineCC, recommendation.Motorcycle.EngineCC);
         analyzer.VerifyAll();
         repository.VerifyAll();
         recommendationService.VerifyAll();
