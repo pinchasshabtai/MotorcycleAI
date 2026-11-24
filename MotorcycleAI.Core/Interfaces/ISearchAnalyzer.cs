@@ -2,9 +2,9 @@ using MotorcycleAI.Core.Models;
 
 namespace MotorcycleAI.Core.Interfaces;
 
-public interface IMotorcycleSearchAgent
+public interface ISearchAnalyzer
 {
-    Task<MotorcycleSearchResult> SearchAsync(
+    Task<MotorcycleSearchRequest> AnalyzeAsync(
         string query,
         CancellationToken cancellationToken = default);
 }

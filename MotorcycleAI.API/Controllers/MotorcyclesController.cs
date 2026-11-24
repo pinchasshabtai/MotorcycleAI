@@ -10,16 +10,16 @@ namespace MotorcycleAI.API.Controllers;
 [Route("api/[controller]")]
 public sealed class MotorcyclesController : ControllerBase
 {
-    private readonly IMotorcycleSearchAgent _motorcycleSearchAgent;
+    private readonly ISearchAnalyzer _searchAnalyzer;
     private readonly IMotorcycleRepository _motorcycleRepository;
     private readonly IRecommendationService _recommendationService;
 
     public MotorcyclesController(
-        IMotorcycleSearchAgent motorcycleSearchAgent,
+        ISearchAnalyzer searchAnalyzer,
         IMotorcycleRepository motorcycleRepository,
         IRecommendationService recommendationService)
     {
-        _motorcycleSearchAgent = motorcycleSearchAgent;
+        _searchAnalyzer = searchAnalyzer;
         _motorcycleRepository = motorcycleRepository;
         _recommendationService = recommendationService;
     }
@@ -34,17 +34,18 @@ public sealed class MotorcyclesController : ControllerBase
         [FromBody] SearchMotorcyclesRequestDto request,
         CancellationToken cancellationToken)
     {
-        var searchResult = await _motorcycleSearchAgent.SearchAsync(request.Query, cancellationToken);
+        var searchRequest = await _searchAnalyzer.AnalyzeAsync(request.Query, cancellationToken);
+        var motorcycles = await _motorcycleRepository.SearchAsync(searchRequest, cancellationToken);
         var recommendationResult = await _recommendationService.RecommendAsync(
             request.Query,
-            searchResult.SearchRequest,
-            searchResult.Motorcycles,
+            searchRequest,
+            motorcycles,
             cancellationToken);
-        var motorcyclesById = searchResult.Motorcycles.ToDictionary(motorcycle => motorcycle.Id);
+        var motorcyclesById = motorcycles.ToDictionary(motorcycle => motorcycle.Id);
 
         return Ok(new MotorcycleSearchResponseDto
         {
-            SearchRequest = ToDto(searchResult.SearchRequest),
+            SearchRequest = ToDto(searchRequest),
             Recommendations = recommendationResult.Recommendations
                 .Select((recommendation, index) => ToDto(
                     recommendation,

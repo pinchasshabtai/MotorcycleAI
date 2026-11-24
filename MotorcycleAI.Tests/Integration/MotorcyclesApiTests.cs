@@ -19,11 +19,14 @@ public sealed class MotorcyclesApiTests
     {
         var searchRequest = new MotorcycleSearchRequest { MaxPrice = 30_000 };
         var motorcycle = CreateMotorcycle(1);
-        var searchAgent = new Mock<IMotorcycleSearchAgent>();
-        searchAgent
-            .Setup(service => service.SearchAsync("מחפש אופנוע עד 30 אלף", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new MotorcycleSearchResult(searchRequest, [motorcycle]));
+        var analyzer = new Mock<ISearchAnalyzer>();
+        analyzer
+            .Setup(service => service.AnalyzeAsync("מחפש אופנוע עד 30 אלף", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(searchRequest);
         var repository = new Mock<IMotorcycleRepository>();
+        repository
+            .Setup(service => service.SearchAsync(searchRequest, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { motorcycle });
         var recommendationService = new Mock<IRecommendationService>();
         recommendationService
             .Setup(service => service.RecommendAsync(
@@ -47,7 +50,7 @@ public sealed class MotorcyclesApiTests
                 ]
             });
 
-        using var factory = CreateFactory(searchAgent, repository, recommendationService);
+        using var factory = CreateFactory(analyzer, repository, recommendationService);
         using var client = factory.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/api/motorcycles/search",
@@ -63,7 +66,7 @@ public sealed class MotorcyclesApiTests
         Assert.Equal("ההתאמה הטובה ביותר", recommendation.RankLabel);
         Assert.Equal(motorcycle.Id, recommendation.Motorcycle.Id);
         Assert.Equal(motorcycle.EngineCC, recommendation.Motorcycle.EngineCC);
-        searchAgent.VerifyAll();
+        analyzer.VerifyAll();
         repository.VerifyAll();
         recommendationService.VerifyAll();
     }
@@ -72,11 +75,14 @@ public sealed class MotorcyclesApiTests
     public async Task Search_ReturnsEmptyRecommendationsWhenNoMotorcyclesAreFound()
     {
         var searchRequest = new MotorcycleSearchRequest();
-        var searchAgent = new Mock<IMotorcycleSearchAgent>();
-        searchAgent
-            .Setup(service => service.SearchAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new MotorcycleSearchResult(searchRequest, Array.Empty<Motorcycle>()));
+        var analyzer = new Mock<ISearchAnalyzer>();
+        analyzer
+            .Setup(service => service.AnalyzeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(searchRequest);
         var repository = new Mock<IMotorcycleRepository>();
+        repository
+            .Setup(service => service.SearchAsync(searchRequest, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<Motorcycle>());
         var recommendationService = new Mock<IRecommendationService>();
         recommendationService
             .Setup(service => service.RecommendAsync(
@@ -90,7 +96,7 @@ public sealed class MotorcyclesApiTests
                 Recommendations = []
             });
 
-        using var factory = CreateFactory(searchAgent, repository, recommendationService);
+        using var factory = CreateFactory(analyzer, repository, recommendationService);
         using var client = factory.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/api/motorcycles/search",
@@ -106,10 +112,10 @@ public sealed class MotorcyclesApiTests
     [Fact]
     public async Task Search_RejectsInvalidRequestBody()
     {
-        var searchAgent = new Mock<IMotorcycleSearchAgent>();
+        var analyzer = new Mock<ISearchAnalyzer>();
         var repository = new Mock<IMotorcycleRepository>();
         var recommendationService = new Mock<IRecommendationService>();
-        using var factory = CreateFactory(searchAgent, repository, recommendationService);
+        using var factory = CreateFactory(analyzer, repository, recommendationService);
         using var client = factory.CreateClient();
 
         using var response = await client.PostAsJsonAsync(
@@ -117,7 +123,7 @@ public sealed class MotorcyclesApiTests
             new { query = "hi" });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        searchAgent.VerifyNoOtherCalls();
+        analyzer.VerifyNoOtherCalls();
         repository.VerifyNoOtherCalls();
         recommendationService.VerifyNoOtherCalls();
     }
@@ -125,13 +131,13 @@ public sealed class MotorcyclesApiTests
     [Fact]
     public async Task Search_MapsUpstreamFailureToServiceUnavailableWithoutStackTrace()
     {
-        var searchAgent = new Mock<IMotorcycleSearchAgent>();
-        searchAgent
-            .Setup(service => service.SearchAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        var analyzer = new Mock<ISearchAnalyzer>();
+        analyzer
+            .Setup(service => service.AnalyzeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("private upstream detail"));
         var repository = new Mock<IMotorcycleRepository>();
         var recommendationService = new Mock<IRecommendationService>();
-        using var factory = CreateFactory(searchAgent, repository, recommendationService);
+        using var factory = CreateFactory(analyzer, repository, recommendationService);
         using var client = factory.CreateClient();
 
         using var response = await client.PostAsJsonAsync(
@@ -151,13 +157,13 @@ public sealed class MotorcyclesApiTests
         var motorcycle = CreateMotorcycle(7);
         motorcycle.PriceIsEstimate = true;
         motorcycle.AttributesAreEstimated = true;
-        var searchAgent = new Mock<IMotorcycleSearchAgent>();
+        var analyzer = new Mock<ISearchAnalyzer>();
         var repository = new Mock<IMotorcycleRepository>();
         repository
             .Setup(service => service.GetByIdAsync(7, It.IsAny<CancellationToken>()))
             .ReturnsAsync(motorcycle);
         var recommendationService = new Mock<IRecommendationService>();
-        using var factory = CreateFactory(searchAgent, repository, recommendationService);
+        using var factory = CreateFactory(analyzer, repository, recommendationService);
         using var client = factory.CreateClient();
 
         using var response = await client.GetAsync("/api/motorcycles/7");
@@ -174,13 +180,13 @@ public sealed class MotorcyclesApiTests
     [Fact]
     public async Task GetById_ReturnsNotFoundWhenMotorcycleDoesNotExist()
     {
-        var searchAgent = new Mock<IMotorcycleSearchAgent>();
+        var analyzer = new Mock<ISearchAnalyzer>();
         var repository = new Mock<IMotorcycleRepository>();
         repository
             .Setup(service => service.GetByIdAsync(999, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Motorcycle?)null);
         var recommendationService = new Mock<IRecommendationService>();
-        using var factory = CreateFactory(searchAgent, repository, recommendationService);
+        using var factory = CreateFactory(analyzer, repository, recommendationService);
         using var client = factory.CreateClient();
 
         using var response = await client.GetAsync("/api/motorcycles/999");
@@ -189,7 +195,7 @@ public sealed class MotorcyclesApiTests
     }
 
     private static WebApplicationFactory<Program> CreateFactory(
-        Mock<IMotorcycleSearchAgent> searchAgent,
+        Mock<ISearchAnalyzer> analyzer,
         Mock<IMotorcycleRepository> repository,
         Mock<IRecommendationService> recommendationService)
     {
@@ -198,10 +204,10 @@ public sealed class MotorcyclesApiTests
             builder.UseEnvironment("Testing");
             builder.ConfigureTestServices(services =>
             {
-                services.RemoveAll<IMotorcycleSearchAgent>();
+                services.RemoveAll<ISearchAnalyzer>();
                 services.RemoveAll<IMotorcycleRepository>();
                 services.RemoveAll<IRecommendationService>();
-                services.AddSingleton(searchAgent.Object);
+                services.AddSingleton(analyzer.Object);
                 services.AddSingleton(repository.Object);
                 services.AddSingleton(recommendationService.Object);
             });

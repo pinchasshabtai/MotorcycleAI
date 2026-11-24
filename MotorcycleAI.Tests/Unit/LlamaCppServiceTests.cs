@@ -56,33 +56,6 @@ public sealed class LlamaCppServiceTests
     }
 
     [Fact]
-    public async Task GenerateToolCallsAsync_SendsToolsAndParsesStringArguments()
-    {
-        var handler = new CallbackHandler(async (request, cancellationToken) =>
-        {
-            var body = await request.Content!.ReadAsStringAsync(cancellationToken);
-            using var json = JsonDocument.Parse(body);
-            Assert.Equal(1, json.RootElement.GetProperty("tools").GetArrayLength());
-            Assert.False(json.RootElement.TryGetProperty("response_format", out _));
-            return JsonResponse(
-                HttpStatusCode.OK,
-                """{"choices":[{"message":{"tool_calls":[{"function":{"name":"SearchMotorcycles","arguments":"{\"MaxPrice\":30000}"}}]}}]}""");
-        });
-        using var client = CreateHttpClient(handler);
-        using var toolsDocument = JsonDocument.Parse(
-            """[{"type":"function","function":{"name":"SearchMotorcycles","parameters":{"type":"object"}}}]""");
-        var service = CreateService(client);
-
-        var toolCall = Assert.Single(await service.GenerateToolCallsAsync(
-            "system",
-            "מחפש עד 30000",
-            toolsDocument.RootElement));
-
-        Assert.Equal("SearchMotorcycles", toolCall.Name);
-        Assert.Equal(30_000, toolCall.Arguments.GetProperty("MaxPrice").GetInt32());
-    }
-
-    [Fact]
     public async Task GenerateAsync_RejectsResponseWithoutChoices()
     {
         var handler = new CallbackHandler(

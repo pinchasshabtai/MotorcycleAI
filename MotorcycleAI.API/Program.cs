@@ -11,7 +11,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddInfrastructure(builder.Configuration);
-builder.Services.AddScoped<IMotorcycleSearchAgent, MotorcycleSearchAgent>();
+builder.Services.AddScoped<ISearchAnalyzer, SearchAnalyzer>();
 builder.Services.AddScoped<IRecommendationService, RecommendationService>();
 
 var app = builder.Build();
