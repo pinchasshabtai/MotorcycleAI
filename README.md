@@ -11,7 +11,7 @@ MotorcycleAI היא אפליקציית Web בעברית שמסייעת למצו�
 
 - **MotorcycleAI.API** – API ואפליקציית Web סטטית, זמינים כברירת מחדל בכתובת `http://localhost:5150`.
 - **MotorcycleAI.Core** – מודלים, ממשקים ולוגיקת ניתוח והמלצות.
-- **MotorcycleAI.Infrastructure** – גישה ל-SQL Server וחיבור לשרת llama.cpp.
+- **MotorcycleAI.Infrastructure** – גישה ל-SQL Server וחיבור למודל דרך llama.cpp או Ollama.
 - **MotorcycleAI.Tests** – בדיקות יחידה ואינטגרציה.
 
 ## מה צריך להתקין
@@ -19,8 +19,9 @@ MotorcycleAI היא אפליקציית Web בעברית שמסייעת למצו�
 1. **.NET 10 SDK** – נדרש לבנייה ולהרצה של הפרויקט.
 2. **SQL Server Express** – יש ליצור או להתקין מופע בשם `SQLEXPRESS`.
 3. **SQL Server Command Line Utilities (`sqlcmd`) או SQL Server Management Studio (SSMS)** – להרצת סקריפטי יצירת מסד הנתונים.
-4. **llama.cpp ל-Windows** – יש להוריד ולחלץ גרסה שכוללת `llama-server.exe` (הוראות בהמשך).
-5. **מודל GGUF** שתואם ל-llama.cpp. לדוגמה, הפרויקט נבדק עם DictaLM 3.0 1.7B Instruct בקוונטיזציית Q4_K_M.
+4. **ספק מודל אחד לבחירתכם:**
+   - **llama.cpp** ל-Windows ו-**מודל GGUF** תואם. לדוגמה, הפרויקט נבדק עם DictaLM 3.0 1.7B Instruct בקוונטיזציית Q4_K_M.
+   - **Ollama** ל-Windows ומודל שהורדתם באמצעות Ollama.
 
 אין צורך להתקין Node.js: ממשק המשתמש משתמש ב-JavaScript רגיל ומוגש מתוך `MotorcycleAI.API\wwwroot`.
 
@@ -47,9 +48,13 @@ sqlcmd -S ".\SQLEXPRESS" -E -i "MotorcycleAI.Infrastructure\Database\Scripts\002
 
 אם SQL Server משתמש בשם מופע או בפרטי התחברות אחרים, עדכנו את `Database:ConnectionString` בקובץ `MotorcycleAI.API\appsettings.json`.
 
-### 3. הגדרת והפעלת מודל llama.cpp
+### 3. בחירת ספק המודל והפעלתו
 
-#### התקנת llama.cpp והמודל
+אפשר להשתמש ב-**llama.cpp** או ב-**Ollama**. אין צורך בשינוי קוד, אבל צריך להגדיר ולהפעיל ספק אחד. האפליקציה בוחרת ב-llama.cpp כאשר קיים מקטע `LlamaCpp` בהגדרות; אם המקטע אינו קיים, היא משתמשת במקטע `Ollama`. לכן, כדי לבחור ב-Ollama, יש להסיר את `LlamaCpp` מ-`MotorcycleAI.API\appsettings.json` ורק להוסיף הגדרת `Ollama`. לאחר שינוי ההגדרות הפעילו מחדש את ה-API.
+
+#### אפשרות א׳: llama.cpp
+
+##### התקנת llama.cpp והמודל
 
 1. היכנסו לעמוד [הגרסאות של llama.cpp](https://github.com/ggml-org/llama.cpp/releases) והורידו חבילת Windows שמתאימה למחשב שלכם. אם אינכם בטוחים איזו חבילה לבחור, התחילו בגרסת CPU.
 2. חלצו את החבילה לתיקייה קבועה, לדוגמה `C:\tools\llama.cpp`, וודאו שבתוכה נמצא הקובץ `llama-server.exe`. אין צורך ב-PATH אם מפעילים אותו באמצעות הנתיב המלא כפי שמודגם למטה.
@@ -85,6 +90,47 @@ curl.exe http://localhost:8080/health
 
 התשובה הצפויה היא `{"status":"ok"}`. הודעת `actively refused` פירושה שהשרת אינו פועל או שאינו מאזין בפורט שהוגדר.
 
+#### אפשרות ב׳: Ollama
+
+1. התקינו את Ollama ל-Windows מהאתר [ollama.com/download](https://ollama.com/download/windows).
+2. פתחו PowerShell והורידו מודל. לדוגמה:
+
+   ```powershell
+   ollama pull qwen2.5:3b
+   ```
+
+   אפשר לבחור מודל אחר, אך יש לוודא שהוא מותקן ושמתאים ליצירת תשובות JSON מובְנות. הציגו את המודלים המותקנים באמצעות:
+
+   ```powershell
+   ollama list
+   ```
+
+3. ודאו ששרת Ollama פועל. בדרך כלל תוכנת Ollama מפעילה אותו ברקע. אם הוא אינו פועל, הריצו בחלון PowerShell:
+
+   ```powershell
+   ollama serve
+   ```
+
+   השאירו את השרת פועל. בדקו את החיבור:
+
+   ```powershell
+   curl.exe http://localhost:11434/api/tags
+   ```
+
+   תשובת JSON עם רשימת המודלים מעידה שהשרת נגיש.
+
+4. פתחו את `MotorcycleAI.API\appsettings.json`. השאירו את ההגדרות `Logging` ו-`Database` ללא שינוי, הסירו את מקטע `LlamaCpp` והגדירו במקום זאת את Ollama:
+
+   ```json
+   "Ollama": {
+     "BaseUrl": "http://localhost:11434",
+     "Model": "qwen2.5:3b",
+     "TimeoutSeconds": 1000
+   }
+   ```
+
+   הערך `Model` חייב להתאים בדיוק לשם שמופיע ב-`ollama list`. אם בחרתם מודל אחר, עדכנו את הערך בהתאם. לאחר מכן הפעילו את ה-API מחדש.
+
 ### 4. הפעלת האפליקציה
 
 בחלון PowerShell נוסף, מתיקיית הפרויקט, הריצו:
@@ -106,6 +152,6 @@ dotnet test MotorcycleAI.Tests\MotorcycleAI.Tests.csproj
 ## סדר הפעלה בכל שימוש
 
 1. ודאו ש-SQL Server Express פועל.
-2. הפעילו את `llama-server.exe` והשאירו אותו רץ.
+2. הפעילו את ספק המודל שהגדרתם והשאירו אותו רץ: `llama-server.exe` עבור llama.cpp או שרת Ollama.
 3. הפעילו את ה-API באמצעות `dotnet run`.
 4. פתחו את `http://localhost:5150`.
